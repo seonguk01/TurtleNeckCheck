@@ -36,10 +36,87 @@
         android:layout_height="0dp"
         android:layout_width="0dp">
 
+        <TextView
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            android:id="@+id/tvSensorTitle"
+            android:textSize="14sp"
+            android:text="휴대폰 기울기: "
+            android:textColor="@color/black"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+        <TextView
+            android:text="0"
+            app:layout_constraintTop_toTopOf="@id/tvSensorTitle"
+            app:layout_constraintBottom_toBottomOf="@id/tvSensorTitle"
+            app:layout_constraintStart_toEndOf="@id/tvSensorTitle"
+            android:id="@+id/tvSensorValue"
+            android:textSize="14sp"
+            android:textColor="@color/black"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
 
 
+        <TextView
+            app:layout_constraintTop_toBottomOf="@id/tvSensorTitle"
+            app:layout_constraintStart_toStartOf="parent"
+            android:id="@+id/tvSensorConvertTitle"
+            android:textSize="14sp"
+            android:text="휴대폰 변환 기울기: "
+            android:textColor="@color/black"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+        <TextView
+            android:text="0"
+            app:layout_constraintTop_toTopOf="@id/tvSensorConvertTitle"
+            app:layout_constraintBottom_toBottomOf="@id/tvSensorConvertTitle"
+            app:layout_constraintStart_toEndOf="@id/tvSensorConvertTitle"
+            android:id="@+id/tvSensorConvertValue"
+            android:textSize="14sp"
+            android:textColor="@color/black"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
 
-
+        <TextView
+            android:layout_marginTop="10dp"
+            app:layout_constraintTop_toBottomOf="@id/tvSensorConvertTitle"
+            app:layout_constraintStart_toStartOf="parent"
+            android:id="@+id/tvFaceAngleTitle"
+            android:textSize="14sp"
+            android:text="얼굴 각도 x: "
+            android:textColor="@color/black"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+        <TextView
+            android:text="0"
+            app:layout_constraintTop_toTopOf="@id/tvFaceAngleTitle"
+            app:layout_constraintBottom_toBottomOf="@id/tvFaceAngleTitle"
+            app:layout_constraintStart_toEndOf="@id/tvFaceAngleTitle"
+            android:id="@+id/tvFaceAngleValue"
+            android:textSize="14sp"
+            android:textColor="@color/black"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+        <TextView
+            android:layout_marginTop="10dp"
+            app:layout_constraintTop_toBottomOf="@id/tvFaceAngleTitle"
+            app:layout_constraintStart_toStartOf="parent"
+            android:id="@+id/tvFaceAngleYTitle"
+            android:textSize="14sp"
+            android:text="얼굴 각도 Y: "
+            android:textColor="@color/black"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+        <TextView
+            android:text="0"
+            app:layout_constraintTop_toTopOf="@id/tvFaceAngleYTitle"
+            app:layout_constraintBottom_toBottomOf="@id/tvFaceAngleYTitle"
+            app:layout_constraintStart_toEndOf="@id/tvFaceAngleYTitle"
+            android:id="@+id/tvFaceAngleYValue"
+            android:textSize="14sp"
+            android:textColor="@color/black"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
         <androidx.constraintlayout.widget.ConstraintLayout
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"

@@ -26,12 +26,19 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.turtle.turtleneckcheckgit.R
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.acos
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner {
 
@@ -50,6 +57,16 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
     inner class LocalBinder : Binder() {
         fun getService(): PostureMonitoringService = this@PostureMonitoringService
     }
+    private val _sensorValue = MutableLiveData<Float>()
+    val sensorValue: LiveData<Float> = _sensorValue
+    private val _sensorFinalValue = MutableLiveData<String>()
+    val sensorFinalValue: LiveData<String> = _sensorFinalValue
+
+    private val _faceAngleX = MutableLiveData<Float>()
+    val faceAngleX: LiveData<Float> = _faceAngleX
+
+    private val _faceAngleZ = MutableLiveData<Float>()
+    val faceAngleZ: LiveData<Float> = _faceAngleZ
 
     override val lifecycle: Lifecycle
         get() = lifecycleRegistry
@@ -170,7 +187,6 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
         detector.process(image)
             .addOnSuccessListener { faces ->
                 Log.d("FaceDetection", "${phoneTilt}PostureMonitoringService: faces :$faces")
-
                 if (faces.isNotEmpty()) {
                     // 얼굴이 인식된 경우
                     for (face in faces) {
@@ -178,9 +194,12 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
                         val headTiltX = face.headEulerAngleX
                         val headTiltZ = face.headEulerAngleZ
                         Log.d("FaceDetection", "${phoneTilt}PostureMonitoringService: headTiltX :$headTiltX")
-
+                        _faceAngleX.postValue(headTiltX)
+                        _faceAngleZ.postValue(headTiltZ)
                         // 얼굴이 일정 각도 이상 기울어진 경우 처리
-                        if (phoneTilt <8.5) {
+                        //headTiltX 이 -값이 될수록 얼굴이 아래로 기울인 상태
+                        //PhoneTilt값이 양수이면 화면이 위로 기울여진 상태
+                        if (phoneTilt >= 4 && headTiltX<=-4) {
                             showWarningPopup()
                         }
                     }
@@ -200,10 +219,27 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
 
     // 자이로센서 데이터 수신
     override fun onSensorChanged(event: SensorEvent?) {
+
         event?.let {
+            val x = event.values[0]
+            val y = event.values[1]
+            val z = event.values[2]
+            val r = sqrt(x.pow(2) + y.pow(2) + z.pow(2))
+
+            Log.d("MainActivity", "onSensorChanged: x: $x, y: $y, z: $z, R: $r")
+            val xrAngle = (90 - acos(x / r) * 180 / PI).toFloat()
+            val yrAngle = (90 - acos(y / r) * 180 / PI).toFloat()
+            phoneTilt = abs(event.values[2])
+            _sensorValue.postValue(abs(y))
+            _sensorFinalValue.postValue("$xrAngle,$yrAngle")
+//            binding.textview.text = String.format(
+//                "x-rotation: %.1f\u00B0 \n y-rotation: %.1f\u00B0", xrAngle, yrAngle)
+        }
+
+     /*   event?.let {
             // X축과 Z축의 기울기를 통해 스마트폰이 얼마나 기울어졌는지 계산
             phoneTilt = Math.abs(event.values[1]) // Y축 (Pitch)
-        }
+        }*/
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}

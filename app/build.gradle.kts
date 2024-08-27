@@ -58,6 +58,7 @@ android {
 
 dependencies {
     implementation(libs.play.services.mlkit.face.detection)
+    implementation(libs.preference.ktx)
 
     implementation(libs.play.services.mlkit.face.detection)
     implementation(libs.androidx.core.ktx)

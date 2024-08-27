@@ -17,9 +17,10 @@ cameraLifecycle = "1.3.4"
 lifecycleService = "2.8.4"
 cameraCore = "1.3.4"
 cameraCamera2 = "1.3.4"
+preference = "1.1.1"
 
 [libraries]
-
+preference-ktx = { group = "androidx.preference", name = "preference-ktx", version.ref = "preference" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
