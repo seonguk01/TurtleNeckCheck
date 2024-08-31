@@ -192,7 +192,7 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
             }
             builder .setChannelId(CHANNEL_ID)
             builder.color = ContextCompat.getColor(this@PostureMonitoringService, R.color.black)
-            builder .setAutoCancel(true)
+            builder .setAutoCancel(false)
         } else {
             builder.setContentTitle(getString(R.string.service_title))
             builder .setTicker(getString(R.string.service_title))
@@ -204,7 +204,7 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
             }else{
                 builder.priority = Notification.PRIORITY_MIN
             }
-            builder  .setAutoCancel(true)
+            builder  .setAutoCancel(false)
         }
         builder.setNumber(0)
         val notification = builder.build()
@@ -220,11 +220,6 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
             ) {
                 // TODO: Consider calling
                 //    ActivityCompat#requestPermissions
-                // here to request the missing permissions, and then overriding
-                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                //                                          int[] grantResults)
-                // to handle the case where the user grants the permission. See the documentation
-                // for ActivityCompat#requestPermissions for more details.
                 return
             }
             notify(1000, notification)
