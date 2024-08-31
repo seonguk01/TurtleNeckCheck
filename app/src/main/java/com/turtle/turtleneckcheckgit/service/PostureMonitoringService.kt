@@ -39,6 +39,8 @@ import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.turtle.turtleneckcheckgit.R
 import com.turtle.turtleneckcheckgit.WarningActivity
+import com.turtle.turtleneckcheckgit.util.Util.isAppInForeground
+import handasoft.mobile.divination.module.pref.SharedPreference
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.PI
@@ -58,10 +60,9 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
     private val lifecycleRegistry: LifecycleRegistry = LifecycleRegistry(this)
 
     private var phoneTilt = 0f // 스마트폰의 기울기 값을 저장
-    private var monitoringTime: Long = 1 * 1000 // 10분
+    private var monitoringTime: Long =   10 * 60* 1000 // 10분
     private val binder = LocalBinder()
     private var lastPopupTime: Long = 0
-    private val popupInterval: Long = 10 * 60 * 1000 // 10분 (밀리초 단위)
 
 
     inner class LocalBinder : Binder() {
@@ -99,11 +100,25 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
-        startForegroundService()
-        startMonitoring()
+        var isEnableService = SharedPreference.getBooleanSharedPreference(this@PostureMonitoringService,"service_enable")
+
+        if(isEnableService){
+            startForegroundService()
+            startMonitoring()
+        }else{
+            stopService()
+        }
+
         return START_STICKY
     }
-
+    private fun stopService() {
+        try {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
     override fun onDestroy() {
         super.onDestroy()
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
@@ -195,6 +210,8 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
 
         detector.process(image)
             .addOnSuccessListener { faces ->
+                var conditionMet = false
+
                 Log.d("FaceDetection", "${phoneTilt}PostureMonitoringService: faces :$faces")
                 if (faces.isNotEmpty()) {
                     // 얼굴이 인식된 경우
@@ -208,35 +225,46 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
                         // 얼굴이 일정 각도 이상 기울어진 경우 처리
                         //headTiltX 이 -값이 될수록 얼굴이 아래로 기울인 상태
                         //PhoneTilt값이 양수이면 화면이 위로 기울여진 상태
-                        if (phoneTilt >= 4 && headTiltX<=-4) {
+                        if (phoneTilt >= 4 && headTiltX<10) {
 //                            Toast.makeText(this, "거북목 조심하세요", Toast.LENGTH_LONG).show()
                             showWarningPopup()
+                            conditionMet = true
                         }
                     }
                 } else {
-
                     // 얼굴이 인식되지 않은 경우
                     Log.d("FaceDetection", " PostureMonitoringService : 얼굴이 인식되지 않았습니다.")
+                }
+                Log.d("FaceDetection", " PostureMonitoringService : $conditionMet.")
+
+                if(!conditionMet){
+                    startMonitoring()
                 }
             }
             .addOnFailureListener {
                 // 오류 처리
+                startMonitoring()
             }
     }
 
     private fun showWarningPopup() {
         val currentTIme = System.currentTimeMillis()
+        Log.d("FaceDetection", " showWarningPopup : ${currentTIme - lastPopupTime >= monitoringTime}.")
+
         if(currentTIme - lastPopupTime >= monitoringTime){
             lastPopupTime = currentTIme //팝업이 뜬후 마지막 시간을 저장한다
 
-            Intent(this, WarningActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP )
+//            if(!isAppInForeground(this)){
+                Intent(this, WarningActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP )
 
-            }.also {
-                startActivity(it)
-            }
+                }.also {
+                    startActivity(it)
+                }
+//            }
+
 
         }
 

@@ -49,6 +49,24 @@
             android:exported="false"
             android:foregroundServiceType="camera"
             tools:ignore="ForegroundServicePermission" />
+
+        <receiver
+            android:name=".receiver.WidgetReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <receiver
+            android:name=".receiver.AlarmReceiverBoot"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name=" android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

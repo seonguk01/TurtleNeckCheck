@@ -5,21 +5,25 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.ui.text.font.FontVariation
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Observer
+import com.turtle.turtleneckcheckgit.common.ActionIntent
 import com.turtle.turtleneckcheckgit.databinding.ActivityMainBinding
 import com.turtle.turtleneckcheckgit.dialog.CommonAlertDialog
 import com.turtle.turtleneckcheckgit.module.PermissionCheckerManager
@@ -35,9 +39,10 @@ class MainActivity : AppCompatActivity(), PermissionCheckerManager.PermissionLis
     private var  isBound = false
     private lateinit var overlayPermissionLauncher: ActivityResultLauncher<Intent>
 
-    private  val serviceConnection = object : ServiceConnection {
+    /*private  val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             val binder = service as PostureMonitoringService.LocalBinder
+            Log.d("FaceDetection", "onServiceConnected: ")
             postureMonitoringService = binder.getService()
             isBound = true
 
@@ -56,10 +61,12 @@ class MainActivity : AppCompatActivity(), PermissionCheckerManager.PermissionLis
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
+            Log.d("FaceDetection", "onServiceDisconnected: ")
+
             isBound = false
         }
 
-    }
+    }*/
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -79,8 +86,6 @@ class MainActivity : AppCompatActivity(), PermissionCheckerManager.PermissionLis
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requiredPermissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
-        binding.tvSensorValue.text =""
-        binding.tvFaceAngleValue.text =""
         permissionHelper = PermissionCheckerManager(this, requiredPermissions.toTypedArray(), 100)
         permissionHelper.requestPermissionsIfNecessary()
         val serviceIntent = Intent(this, PostureMonitoringService::class.java)
@@ -102,10 +107,10 @@ class MainActivity : AppCompatActivity(), PermissionCheckerManager.PermissionLis
 
         binding.btnServiceStart.setOnClickListener {
             if(!isService){
-
+//                stopService(serviceIntent)
                 SharedPreference.putSharedPreference(this@MainActivity,"service_enable",true)
                 ContextCompat.startForegroundService(this, serviceIntent)
-                bindService(intent, serviceConnection, BIND_AUTO_CREATE)
+//                bindService(intent, serviceConnection, BIND_AUTO_CREATE)
 
                 isService = true
             }
@@ -113,7 +118,9 @@ class MainActivity : AppCompatActivity(), PermissionCheckerManager.PermissionLis
         binding.btnServiceStop.setOnClickListener {
             if(isService){
                 SharedPreference.putSharedPreference(this@MainActivity,"service_enable",false)
-                stopService(serviceIntent)
+                ContextCompat.startForegroundService(this, serviceIntent)
+
+//                stopSettingForegroundService()
 //                unbindService(serviceConnection)
                 isService = false
             }
@@ -126,26 +133,67 @@ class MainActivity : AppCompatActivity(), PermissionCheckerManager.PermissionLis
         var isEnableService = SharedPreference.getBooleanSharedPreference(this@MainActivity,"service_enable")
 
         if(isEnableService){
-            stopService(serviceIntent)
+            SharedPreference.putSharedPreference(this@MainActivity,"service_enable",true)
             ContextCompat.startForegroundService(this, serviceIntent)
-            bindService(intent, serviceConnection, BIND_AUTO_CREATE)
+//            bindService(intent, serviceConnection, BIND_AUTO_CREATE)
 
         }else{
-            stopService(serviceIntent)
+            SharedPreference.putSharedPreference(this@MainActivity,"service_enable",false)
+            ContextCompat.startForegroundService(this, serviceIntent)
 //            unbindService(serviceConnection)
         }
     }
-    private fun checkOverlayPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (!Settings.canDrawOverlays(this)) {
-                // 권한이 없으면 설정 화면으로 이동
-                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
-                overlayPermissionLauncher.launch(intent)
+
+    private fun stopSettingForegroundService() {
+        try{
+            var action =  ActionIntent.STOPFOREGROUND_ACTION
+            Log.d("handa_log", "stopForegroundService: ${action}")
+
+            val startIntent = Intent(this, PostureMonitoringService::class.java)
+            intent.putExtra("action",action)
+            startIntent.action = action
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(startIntent)
             } else {
-                // 권한이 있으면 팝업을 띄움
+                startService(startIntent)
             }
-        } else {
-            // 권한이 필요 없는 버전
+        }catch (e : Throwable){
+            e.printStackTrace()
+        }
+        SharedPreference.putSharedPreference(this@MainActivity,"service_enable",false)
+
+    }
+
+    private fun startSettingForegroundService() {
+
+        try{
+            var action = ActionIntent.STARTFOREGROUND_ACTION
+            Log.d("handa_log", "startForegroundService: $action")
+
+            val startIntent = Intent(this, PostureMonitoringService::class.java)
+            intent.putExtra("action",action)
+            startIntent.action = action
+            if (ActivityCompat.checkSelfPermission(
+                    this@MainActivity,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ){
+
+                ActivityCompat.requestPermissions(this@MainActivity,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),4000)
+
+                return
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
+                startForegroundService(startIntent)
+            } else {
+                startService(startIntent)
+            }
+            SharedPreference.putSharedPreference(this@MainActivity,"service_enable",true)
+
+        }catch (e : Throwable){
+            e.printStackTrace()
         }
     }
     override fun onRequestPermissionsResult(
