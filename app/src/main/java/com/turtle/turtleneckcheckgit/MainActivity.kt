@@ -35,38 +35,7 @@ class MainActivity : AppCompatActivity(), PermissionCheckerManager.PermissionLis
     private lateinit var permissionHelper: PermissionCheckerManager
     var  isService : Boolean= false;
     var isPermission : Boolean = false
-    private var postureMonitoringService : PostureMonitoringService ?= null
-    private var  isBound = false
     private lateinit var overlayPermissionLauncher: ActivityResultLauncher<Intent>
-
-    /*private  val serviceConnection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            val binder = service as PostureMonitoringService.LocalBinder
-            Log.d("FaceDetection", "onServiceConnected: ")
-            postureMonitoringService = binder.getService()
-            isBound = true
-
-            postureMonitoringService?.sensorValue?.observe(this@MainActivity, Observer {
-                value -> binding.tvSensorValue.text = "$value"
-            })
-            postureMonitoringService?.sensorFinalValue?.observe(this@MainActivity, Observer {
-                    value -> binding.tvSensorConvertValue.text = "$value"
-            })
-            postureMonitoringService?.faceAngleX?.observe(this@MainActivity, Observer {
-                    value -> binding.tvFaceAngleValue.text = "$value"
-            })
-            postureMonitoringService?.faceAngleZ?.observe(this@MainActivity, Observer {
-                    value -> binding.tvFaceAngleYValue.text = "$value"
-            })
-        }
-
-        override fun onServiceDisconnected(name: ComponentName?) {
-            Log.d("FaceDetection", "onServiceDisconnected: ")
-
-            isBound = false
-        }
-
-    }*/
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -107,21 +76,29 @@ class MainActivity : AppCompatActivity(), PermissionCheckerManager.PermissionLis
 
         binding.btnServiceStart.setOnClickListener {
             if(!isService){
-//                stopService(serviceIntent)
                 SharedPreference.putSharedPreference(this@MainActivity,"service_enable",true)
-                ContextCompat.startForegroundService(this, serviceIntent)
-//                bindService(intent, serviceConnection, BIND_AUTO_CREATE)
+                serviceIntent.putExtra("action",ActionIntent.STARTFOREGROUND_ACTION)
+                serviceIntent.action = ActionIntent.STARTFOREGROUND_ACTION;
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService( serviceIntent)
+                }else{
+                    startService(serviceIntent)
+                }
 
                 isService = true
             }
         }
         binding.btnServiceStop.setOnClickListener {
             if(isService){
+                serviceIntent.putExtra("action",ActionIntent.STOPFOREGROUND_ACTION)
+                serviceIntent.action = ActionIntent.STOPFOREGROUND_ACTION;
                 SharedPreference.putSharedPreference(this@MainActivity,"service_enable",false)
-                ContextCompat.startForegroundService(this, serviceIntent)
-
-//                stopSettingForegroundService()
-//                unbindService(serviceConnection)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService( serviceIntent)
+                }else{
+                    startService(serviceIntent)
+                }
                 isService = false
             }
         }
@@ -131,71 +108,21 @@ class MainActivity : AppCompatActivity(), PermissionCheckerManager.PermissionLis
             insets
         }
         var isEnableService = SharedPreference.getBooleanSharedPreference(this@MainActivity,"service_enable")
+        Log.e("handa_log", "service_enable: $isEnableService")
 
         if(isEnableService){
             SharedPreference.putSharedPreference(this@MainActivity,"service_enable",true)
-            ContextCompat.startForegroundService(this, serviceIntent)
-//            bindService(intent, serviceConnection, BIND_AUTO_CREATE)
-
-        }else{
-            SharedPreference.putSharedPreference(this@MainActivity,"service_enable",false)
-            ContextCompat.startForegroundService(this, serviceIntent)
-//            unbindService(serviceConnection)
-        }
-    }
-
-    private fun stopSettingForegroundService() {
-        try{
-            var action =  ActionIntent.STOPFOREGROUND_ACTION
-            Log.d("handa_log", "stopForegroundService: ${action}")
-
-            val startIntent = Intent(this, PostureMonitoringService::class.java)
-            intent.putExtra("action",action)
-            startIntent.action = action
+            serviceIntent.putExtra("action",ActionIntent.STARTFOREGROUND_ACTION)
+            serviceIntent.action = ActionIntent.STARTFOREGROUND_ACTION;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(startIntent)
-            } else {
-                startService(startIntent)
+                startForegroundService( serviceIntent)
+            }else{
+                startService(serviceIntent)
             }
-        }catch (e : Throwable){
-            e.printStackTrace()
-        }
-        SharedPreference.putSharedPreference(this@MainActivity,"service_enable",false)
 
-    }
-
-    private fun startSettingForegroundService() {
-
-        try{
-            var action = ActionIntent.STARTFOREGROUND_ACTION
-            Log.d("handa_log", "startForegroundService: $action")
-
-            val startIntent = Intent(this, PostureMonitoringService::class.java)
-            intent.putExtra("action",action)
-            startIntent.action = action
-            if (ActivityCompat.checkSelfPermission(
-                    this@MainActivity,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ){
-
-                ActivityCompat.requestPermissions(this@MainActivity,
-                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),4000)
-
-                return
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-
-                startForegroundService(startIntent)
-            } else {
-                startService(startIntent)
-            }
-            SharedPreference.putSharedPreference(this@MainActivity,"service_enable",true)
-
-        }catch (e : Throwable){
-            e.printStackTrace()
         }
     }
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<String>,

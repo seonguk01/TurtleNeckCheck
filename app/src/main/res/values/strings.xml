@@ -1,4 +1,6 @@
 <resources>
     <string name="app_name">거북목테스트</string>
     <string name="title_activity_main2">MainActivity2</string>
+    <string name="service_title" translatable="false">거북목 검사 실행중</string>
+    <string name="service_content" translatable="false">여기를 눌러 앱을 실행해주세요.</string>
 </resources>
