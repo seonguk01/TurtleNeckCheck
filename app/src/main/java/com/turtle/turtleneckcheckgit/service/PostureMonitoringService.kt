@@ -192,7 +192,7 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
             }
             builder .setChannelId(CHANNEL_ID)
             builder.color = ContextCompat.getColor(this@PostureMonitoringService, R.color.black)
-            builder .setAutoCancel(false)
+            builder .setAutoCancel(true)
         } else {
             builder.setContentTitle(getString(R.string.service_title))
             builder .setTicker(getString(R.string.service_title))
@@ -204,8 +204,9 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
             }else{
                 builder.priority = Notification.PRIORITY_MIN
             }
-            builder  .setAutoCancel(false)
+            builder .setAutoCancel(true)
         }
+        builder.setCategory(Notification.CATEGORY_SERVICE)
         builder.setNumber(0)
         val notification = builder.build()
 
