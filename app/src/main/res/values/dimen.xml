@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <dimen name="line_01">1dp</dimen>
+    <dimen name="line_02">1.5dp</dimen>
+    <dimen name="line_03">2dp</dimen>
+
+    <dimen name="height_01">48dp</dimen>
+    <dimen name="height_02">56dp</dimen>
+    <dimen name="height_03">60dp</dimen>
+    <dimen name="height_04">77dp</dimen>
+    <dimen name="height_05">42dp</dimen>
+    <dimen name="height_06">46dp</dimen>
+    <dimen name="height_07">64dp</dimen>
+    <dimen name="height_08">40dp</dimen>
+    <dimen name="height_09">86dp</dimen>
+    <dimen name="height_10">36dp</dimen>
+    <dimen name="height_11">80dp</dimen>
+    <dimen name="height_12">48dp</dimen>
+    <dimen name="height_13">92dp</dimen>
+
+    <dimen name="padding_left_right_01">24dp</dimen>
+    <dimen name="padding_left_right_02">16dp</dimen>
+    <dimen name="padding_left_right_03">20dp</dimen>
+    <dimen name="padding_left_right_04">20dp</dimen>
+    <dimen name="padding_left_right_05">50dp</dimen>
+
+    <dimen name="padding_25">25dp</dimen>
+    <dimen name="padding_13">13dp</dimen>
+    <dimen name="padding_14">14dp</dimen>
+    <dimen name="padding_12">12dp</dimen>
+
+    <dimen name="text_size_13">13dp</dimen>
+    <dimen name="text_size_15">15dp</dimen>
+
+    <dimen name="text_size_16">16dp</dimen>
+    <dimen name="text_size_18">18dp</dimen>
+    <dimen name="text_size_10">10dp</dimen>
+    <dimen name="text_size_14">14dp</dimen>
+    <dimen name="text_size_24">24dp</dimen>
+    <dimen name="text_size_11">11dp</dimen>
+    <dimen name="text_size_12">12dp</dimen>
+    <dimen name="text_size_22">22dp</dimen>
+    <dimen name="text_size_28">28dp</dimen>
+
+</resources>

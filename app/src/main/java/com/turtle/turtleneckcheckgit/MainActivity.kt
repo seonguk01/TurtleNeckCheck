@@ -5,17 +5,23 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.ActivityInfo
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.ui.text.font.FontVariation
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Observer
 import com.turtle.turtleneckcheckgit.databinding.ActivityMainBinding
+import com.turtle.turtleneckcheckgit.dialog.CommonAlertDialog
 import com.turtle.turtleneckcheckgit.module.PermissionCheckerManager
 import com.turtle.turtleneckcheckgit.service.PostureMonitoringService
 import handasoft.mobile.divination.module.pref.SharedPreference
@@ -24,9 +30,10 @@ class MainActivity : AppCompatActivity(), PermissionCheckerManager.PermissionLis
     private lateinit var binding: ActivityMainBinding
     private lateinit var permissionHelper: PermissionCheckerManager
     var  isService : Boolean= false;
-
+    var isPermission : Boolean = false
     private var postureMonitoringService : PostureMonitoringService ?= null
     private var  isBound = false
+    private lateinit var overlayPermissionLauncher: ActivityResultLauncher<Intent>
 
     private  val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -63,7 +70,8 @@ class MainActivity : AppCompatActivity(), PermissionCheckerManager.PermissionLis
 
         val requiredPermissions = mutableListOf(
             Manifest.permission.CAMERA,
-            Manifest.permission.FOREGROUND_SERVICE_CAMERA
+            Manifest.permission.FOREGROUND_SERVICE_CAMERA,
+            Manifest.permission.POST_NOTIFICATIONS,
 
 
         )
@@ -77,8 +85,24 @@ class MainActivity : AppCompatActivity(), PermissionCheckerManager.PermissionLis
         permissionHelper.requestPermissionsIfNecessary()
         val serviceIntent = Intent(this, PostureMonitoringService::class.java)
 
+        // ActivityResultLauncher 초기화
+        //다른앱 위에 띄우기 권한 획득을 위한 로직
+        overlayPermissionLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (Settings.canDrawOverlays(this)) {
+                    // 권한이 부여된 경우 팝업을 띄움
+                } else {
+                    // 권한이 부여되지 않은 경우 처리
+                    showPermissionDeniedDialog()
+                }
+            }
+        }
+
         binding.btnServiceStart.setOnClickListener {
             if(!isService){
+
                 SharedPreference.putSharedPreference(this@MainActivity,"service_enable",true)
                 ContextCompat.startForegroundService(this, serviceIntent)
                 bindService(intent, serviceConnection, BIND_AUTO_CREATE)
@@ -111,7 +135,19 @@ class MainActivity : AppCompatActivity(), PermissionCheckerManager.PermissionLis
 //            unbindService(serviceConnection)
         }
     }
-
+    private fun checkOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(this)) {
+                // 권한이 없으면 설정 화면으로 이동
+                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+                overlayPermissionLauncher.launch(intent)
+            } else {
+                // 권한이 있으면 팝업을 띄움
+            }
+        } else {
+            // 권한이 필요 없는 버전
+        }
+    }
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<String>,
@@ -123,12 +159,45 @@ class MainActivity : AppCompatActivity(), PermissionCheckerManager.PermissionLis
 
     override fun onPermissionsGranted() {
         // 모든 권한이 허용되었을 때 처리할 로직
-//        startPostureService()
-    }
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+            if(!Settings.canDrawOverlays(this@MainActivity)){
+                //권한이 없으면 설정 화면으로 이동
+                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+                startActivityForResult(intent, 1000)
 
+                overlayPermissionLauncher = registerForActivityResult(
+                    ActivityResultContracts.StartActivityForResult()
+                ) { result ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        if (Settings.canDrawOverlays(this)) {
+                            // 권한이 부여된 경우 팝업을 띄움
+                            Toast.makeText(this, "권한 설정이 완료되었습니다.", Toast.LENGTH_LONG).show()
+
+                        } else {
+                            // 권한이 부여되지 않은 경우 처리
+                            showPermissionDeniedDialog()
+                        }
+                    }
+                }
+            }
+        }
+        isPermission = true
+    }
+    private fun showPermissionDeniedDialog() {
+        try {
+            val alert = CommonAlertDialog(
+                this@MainActivity,
+            )
+            alert.setShowCancelBtn(false)
+            alert.show()
+        } catch (e: Exception) {
+        }
+
+    }
     override fun onPermissionsDenied() {
         // 권한이 거부된 경우 처리할 로직
         Toast.makeText(this, "권한이 필요합니다.", Toast.LENGTH_SHORT).show()
+        isPermission = false
     }
 
     private fun startPostureService() {

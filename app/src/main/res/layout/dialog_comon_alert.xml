@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical" android:layout_width="match_parent"
+    android:background="@color/bg_01"
+    android:gravity="center"
+    android:layout_height="match_parent">
+
+
+    <RelativeLayout
+        android:id="@+id/contentView"
+        android:elevation="40dp"
+        android:background="@drawable/box_01"
+        android:layout_width="292dp"
+        android:paddingBottom="@dimen/padding_left_right_04"
+        android:layout_height="wrap_content">
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="292dp"
+            android:layout_height="wrap_content"
+
+            >
+
+            <LinearLayout
+                android:id="@+id/llayoutForTitle"
+                android:visibility="visible"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <LinearLayout
+                    android:gravity="center"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/height_07">
+
+                    <TextView
+                        android:id="@+id/tvTopTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="@dimen/text_size_16"
+                        android:textColor="@color/black"
+                        android:lineSpacingExtra="24sp"
+                        android:gravity="center_horizontal"
+                        android:text="알림"
+                        />
+                </LinearLayout>
+
+            </LinearLayout>
+            <LinearLayout
+                android:paddingLeft="@dimen/padding_left_right_04"
+                android:paddingRight="@dimen/padding_left_right_04"
+                android:gravity="center"
+                android:paddingBottom="@dimen/padding_25"
+                android:paddingTop="@dimen/padding_25"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:orientation="vertical"
+                android:layout_weight="1">
+                <TextView
+                    android:id="@+id/tvContent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="@dimen/text_size_15"
+                    android:textColor="@color/black"
+                    android:lineSpacingExtra="7dp"
+                    android:gravity="center"
+                    android:text="이 기능을 사용하려면 다른 앱 위에 표시 권한이 필요합니다."
+                    />
+            </LinearLayout>
+            <LinearLayout
+                android:paddingLeft="@dimen/padding_left_right_04"
+                android:paddingRight="@dimen/padding_left_right_04"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+
+
+                <Button
+                    android:layout_marginRight="11dp"
+                    android:id="@+id/btnCancel"
+                    android:background="@drawable/btn_02"
+                    android:textSize="@dimen/text_size_14"
+                    android:textColor="@color/black"
+                    android:lineSpacingExtra="6sp"
+                    android:gravity="center"
+                    android:text="취소"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="@dimen/height_06"/>
+
+
+                <Button
+                    android:id="@+id/btnOk"
+                    android:background="@drawable/btn_01_selector"
+                    android:textSize="@dimen/text_size_14"
+                    android:textColor="@color/black"
+                    android:lineSpacingExtra="6sp"
+                    android:gravity="center"
+                    android:text="확인"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="@dimen/height_06"/>
+            </LinearLayout>
+        </LinearLayout>
+        <RelativeLayout
+            android:visibility="gone"
+            android:padding="@dimen/padding_left_right_04"
+            android:layout_alignParentRight="true"
+            android:id="@+id/btnClose"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+            <ImageView
+                android:background="@drawable/ic_close_01"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+        </RelativeLayout>
+    </RelativeLayout>
+</LinearLayout>

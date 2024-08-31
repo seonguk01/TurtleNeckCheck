@@ -11,6 +11,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/> <!-- //액티비티 형태로 띄울떄 다른앱 허용 퍼미션 -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>  <!--노티로 경고 팝업 띄울떄 -->
+
     <application
 
         android:allowBackup="true"
@@ -35,6 +38,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".WarningActivity"
+            android:theme="@style/Theme.AppCompat.Translucent" />
 
         <service
             android:name=".service.PostureMonitoringService"

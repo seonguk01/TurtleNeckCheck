@@ -1,9 +1,12 @@
 package com.turtle.turtleneckcheckgit.service
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -21,7 +24,10 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -32,6 +38,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.turtle.turtleneckcheckgit.R
+import com.turtle.turtleneckcheckgit.WarningActivity
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.PI
@@ -53,6 +60,9 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
     private var phoneTilt = 0f // 스마트폰의 기울기 값을 저장
     private var monitoringTime: Long = 1 * 1000 // 10분
     private val binder = LocalBinder()
+    private var lastPopupTime: Long = 0
+    private val popupInterval: Long = 10 * 60 * 1000 // 10분 (밀리초 단위)
+
 
     inner class LocalBinder : Binder() {
         fun getService(): PostureMonitoringService = this@PostureMonitoringService
@@ -106,8 +116,8 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
     private fun startForegroundService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationChannel = NotificationChannel(
-                "POSTURE_MONITORING_CHANNEL",
-                "Posture Monitoring",
+                "TURTLE_NECK",
+                "거북목 테스트",
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = "Monitoring your posture to prevent neck strain."
@@ -116,7 +126,7 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
             val notificationManager = getSystemService(NotificationManager::class.java)
             notificationManager.createNotificationChannel(notificationChannel)
 
-            val notification = NotificationCompat.Builder(this, "POSTURE_MONITORING_CHANNEL")
+            val notification = NotificationCompat.Builder(this, "TURTLE_NECK")
                 .setContentTitle("Posture Monitoring Active")
                 .setContentText("Monitoring your posture in the background.")
                 .setSmallIcon(R.drawable.ic_warning)
@@ -145,11 +155,10 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
 
-            imageAnalysis.setAnalyzer(cameraExecutor, {
-                imageProxy ->
+            imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
                 processImage(imageProxy)
 
-            })
+            }
 
             val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
 
@@ -200,10 +209,12 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
                         //headTiltX 이 -값이 될수록 얼굴이 아래로 기울인 상태
                         //PhoneTilt값이 양수이면 화면이 위로 기울여진 상태
                         if (phoneTilt >= 4 && headTiltX<=-4) {
+//                            Toast.makeText(this, "거북목 조심하세요", Toast.LENGTH_LONG).show()
                             showWarningPopup()
                         }
                     }
                 } else {
+
                     // 얼굴이 인식되지 않은 경우
                     Log.d("FaceDetection", " PostureMonitoringService : 얼굴이 인식되지 않았습니다.")
                 }
@@ -214,8 +225,24 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
     }
 
     private fun showWarningPopup() {
-        Toast.makeText(this, "거북목 조심하세요", Toast.LENGTH_LONG).show()
+        val currentTIme = System.currentTimeMillis()
+        if(currentTIme - lastPopupTime >= monitoringTime){
+            lastPopupTime = currentTIme //팝업이 뜬후 마지막 시간을 저장한다
+
+            Intent(this, WarningActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP )
+
+            }.also {
+                startActivity(it)
+            }
+
+        }
+
+
     }
+
 
     // 자이로센서 데이터 수신
     override fun onSensorChanged(event: SensorEvent?) {
