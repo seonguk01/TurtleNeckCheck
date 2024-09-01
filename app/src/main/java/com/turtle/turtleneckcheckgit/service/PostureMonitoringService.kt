@@ -1,6 +1,7 @@
 package com.turtle.turtleneckcheckgit.service
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -40,6 +41,7 @@ import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.turtle.turtleneckcheckgit.R
 import com.turtle.turtleneckcheckgit.WarningActivity
 import com.turtle.turtleneckcheckgit.common.ActionIntent
+import com.turtle.turtleneckcheckgit.receiver.WidgetReceiver
 import com.turtle.turtleneckcheckgit.util.Util.isAppInForeground
 import handasoft.mobile.divination.module.pref.SharedPreference
 import handasoft.mobile.divination.module.pref.SharedPreference.putSharedPreference
@@ -57,7 +59,7 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
     private lateinit var handler: Handler
     private lateinit var sensorManager: SensorManager
     private lateinit var accelerometer: Sensor
-
+    private var CHANNEL_ID = "turtle_neck"
     // LifecycleRegistry를 초기화
     private val lifecycleRegistry: LifecycleRegistry = LifecycleRegistry(this)
 
@@ -125,6 +127,8 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
     }
     private fun stopService() {
         try {
+            stopCamera()
+            stopSensorMonitoring()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         } catch (e: Exception) {
@@ -133,6 +137,7 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
     }
     override fun onDestroy() {
         super.onDestroy()
+        stopService()
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         cameraExecutor.shutdown()
         handler.removeCallbacksAndMessages(null)
@@ -140,27 +145,84 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
         sensorManager.unregisterListener(this)
     }
 
-    private fun startForegroundService() {
+
+    private fun createNotificationChannel() {
+        // Create the NotificationChannel, but only on API 26+ because
+        // the NotificationChannel class is new and not in the support library
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notificationChannel = NotificationChannel(
-                "TURTLE_NECK",
-                "거북목 테스트",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Monitoring your posture to prevent neck strain."
+            val name = "거북목"
+            val descriptionText = ""
+            val importance = NotificationManager.IMPORTANCE_HIGH
+            val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
+                description = descriptionText
             }
-
-            val notificationManager = getSystemService(NotificationManager::class.java)
-            notificationManager.createNotificationChannel(notificationChannel)
-
-            val notification = NotificationCompat.Builder(this, "TURTLE_NECK")
-                .setContentTitle("Posture Monitoring Active")
-                .setContentText("Monitoring your posture in the background.")
-                .setSmallIcon(R.drawable.ic_warning)
-                .build()
-
-            startForeground(1, notification)
+            // Register the channel with the system
+            val notificationManager: NotificationManager =
+                getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
         }
+    }
+
+    private fun startForegroundService() {
+        createNotificationChannel()
+        val notificationIntent = Intent(ActionIntent.ACTION_SERVICE_DEFAULT)
+        notificationIntent.setClass(this@PostureMonitoringService, WidgetReceiver::class.java)
+        val pi : PendingIntent =  PendingIntent.getBroadcast(this@PostureMonitoringService, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE or 0)
+        var builder = NotificationCompat.Builder(this, CHANNEL_ID)
+        builder.setContentIntent(pi)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            builder.setContentTitle(getString(R.string.service_title))
+            builder  .setTicker(getString(R.string.service_title))
+            builder .setContentText(getString(R.string.service_content))
+            builder .setSmallIcon(R.drawable.ic_warning)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                builder.priority = NotificationManager.IMPORTANCE_MIN
+            }else{
+                builder.priority = Notification.PRIORITY_MIN
+            }
+            builder .setChannelId(CHANNEL_ID)
+            builder.color = ContextCompat.getColor(this@PostureMonitoringService, R.color.black)
+            builder .setAutoCancel(true)
+        } else {
+            builder.setContentTitle(getString(R.string.service_title))
+            builder .setTicker(getString(R.string.service_title))
+            builder  .setContentText(getString(R.string.service_content))
+            builder  .setSmallIcon(R.drawable.ic_warning)
+            builder  .setChannelId(CHANNEL_ID)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                builder.priority = NotificationManager.IMPORTANCE_MIN
+            }else{
+                builder.priority = Notification.PRIORITY_MIN
+            }
+            builder  .setAutoCancel(true)
+        }
+        builder.setNumber(0)
+        val notification = builder.build()
+
+
+
+        with(NotificationManagerCompat.from(this)) {
+            // notificationId is a unique int for each notification that you must define
+            if (ActivityCompat.checkSelfPermission(
+                    applicationContext,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                // TODO: Consider calling
+                //    ActivityCompat#requestPermissions
+                // here to request the missing permissions, and then overriding
+                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                //                                          int[] grantResults)
+                // to handle the case where the user grants the permission. See the documentation
+                // for ActivityCompat#requestPermissions for more details.
+                return
+            }
+            notify(1000, notification)
+        }
+
+// Notification ID cannot be 0.
+        startForeground(1000, notification)
     }
 
     private fun startMonitoring() {
