@@ -119,7 +119,7 @@ class MainActivity : AppCompatActivity(), PermissionCheckerManager.PermissionLis
             }else{
                 startService(serviceIntent)
             }
-
+            isService = true
         }
     }
 
