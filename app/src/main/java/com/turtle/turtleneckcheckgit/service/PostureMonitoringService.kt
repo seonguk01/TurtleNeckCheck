@@ -8,6 +8,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.PointF
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -38,6 +39,7 @@ import androidx.lifecycle.MutableLiveData
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
+import com.google.mlkit.vision.face.FaceLandmark
 import com.turtle.turtleneckcheckgit.R
 import com.turtle.turtleneckcheckgit.WarningActivity
 import com.turtle.turtleneckcheckgit.common.ActionIntent
@@ -60,28 +62,16 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
     private lateinit var sensorManager: SensorManager
     private lateinit var accelerometer: Sensor
     private var CHANNEL_ID = "turtle_neck"
-    // LifecycleRegistry를 초기화
     private val lifecycleRegistry: LifecycleRegistry = LifecycleRegistry(this)
 
     private var phoneTilt = 0f // 스마트폰의 기울기 값을 저장
-    private var monitoringTime: Long =   10 * 60* 1000 // 10분
+    private var monitoringTime: Long = 10 * 60 * 1000 // 10분
     private val binder = LocalBinder()
     private var lastPopupTime: Long = 0
-
-
+    val thresholdDistance = 150f // 목이 앞으로 빠진 정도를 수치화할 때 중요한 기준이 됩니다.
     inner class LocalBinder : Binder() {
         fun getService(): PostureMonitoringService = this@PostureMonitoringService
     }
-    private val _sensorValue = MutableLiveData<Float>()
-    val sensorValue: LiveData<Float> = _sensorValue
-    private val _sensorFinalValue = MutableLiveData<String>()
-    val sensorFinalValue: LiveData<String> = _sensorFinalValue
-
-    private val _faceAngleX = MutableLiveData<Float>()
-    val faceAngleX: LiveData<Float> = _faceAngleX
-
-    private val _faceAngleZ = MutableLiveData<Float>()
-    val faceAngleZ: LiveData<Float> = _faceAngleZ
 
     override val lifecycle: Lifecycle
         get() = lifecycleRegistry
@@ -98,8 +88,6 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
 
         // 자이로 센서 등록
         sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL)
-
-
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -109,11 +97,10 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
         when (intentAction) {
             ActionIntent.STOPFOREGROUND_ACTION -> {
                 stopService()
-                putSharedPreference(applicationContext,"service_enable",false)
-
+                putSharedPreference(applicationContext, "service_enable", false)
             }
-            ActionIntent.STARTFOREGROUND_ACTION ->{
-                putSharedPreference(applicationContext,"service_enable",true)
+            ActionIntent.STARTFOREGROUND_ACTION -> {
+                putSharedPreference(applicationContext, "service_enable", true)
 
                 Log.e("handa_log", "onStartCommand 1: $intentAction")
 
@@ -125,6 +112,7 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
         }
         return START_REDELIVER_INTENT
     }
+
     private fun stopService() {
         try {
             stopCamera()
@@ -135,28 +123,21 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
             e.printStackTrace()
         }
     }
+
     override fun onDestroy() {
         super.onDestroy()
         stopService()
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         cameraExecutor.shutdown()
         handler.removeCallbacksAndMessages(null)
-        // 자이로센서 해제
         sensorManager.unregisterListener(this)
     }
 
-
     private fun createNotificationChannel() {
-        // Create the NotificationChannel, but only on API 26+ because
-        // the NotificationChannel class is new and not in the support library
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "거북목"
-            val descriptionText = ""
             val importance = NotificationManager.IMPORTANCE_HIGH
-            val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
-                description = descriptionText
-            }
-            // Register the channel with the system
+            val channel = NotificationChannel(CHANNEL_ID, name, importance)
             val notificationManager: NotificationManager =
                 getSystemService(NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
@@ -167,66 +148,38 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
         createNotificationChannel()
         val notificationIntent = Intent(ActionIntent.ACTION_SERVICE_DEFAULT)
         notificationIntent.setClass(this@PostureMonitoringService, WidgetReceiver::class.java)
-        val pi : PendingIntent =  PendingIntent.getBroadcast(this@PostureMonitoringService, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE or 0)
-        var builder = NotificationCompat.Builder(this, CHANNEL_ID)
-        builder.setContentIntent(pi)
+        val pi: PendingIntent = PendingIntent.getBroadcast(
+            this@PostureMonitoringService, 0, notificationIntent,
+            PendingIntent.FLAG_IMMUTABLE or 0
+        )
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentIntent(pi)
+            .setContentTitle(getString(R.string.service_title))
+            .setContentText(getString(R.string.service_content))
+            .setSmallIcon(R.drawable.ic_warning)
+            .setAutoCancel(true)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            builder.setContentTitle(getString(R.string.service_title))
-            builder  .setTicker(getString(R.string.service_title))
-            builder .setContentText(getString(R.string.service_content))
-            builder .setSmallIcon(R.drawable.ic_warning)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                builder.priority = NotificationManager.IMPORTANCE_MIN
-            }else{
-                builder.priority = Notification.PRIORITY_MIN
-            }
-            builder .setChannelId(CHANNEL_ID)
             builder.color = ContextCompat.getColor(this@PostureMonitoringService, R.color.black)
-            builder .setAutoCancel(true)
-        } else {
-            builder.setContentTitle(getString(R.string.service_title))
-            builder .setTicker(getString(R.string.service_title))
-            builder  .setContentText(getString(R.string.service_content))
-            builder  .setSmallIcon(R.drawable.ic_warning)
-            builder  .setChannelId(CHANNEL_ID)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                builder.priority = NotificationManager.IMPORTANCE_MIN
-            }else{
-                builder.priority = Notification.PRIORITY_MIN
-            }
-            builder  .setAutoCancel(true)
         }
-        builder.setNumber(0)
+
         val notification = builder.build()
 
-
-
         with(NotificationManagerCompat.from(this)) {
-            // notificationId is a unique int for each notification that you must define
             if (ActivityCompat.checkSelfPermission(
                     applicationContext,
                     Manifest.permission.POST_NOTIFICATIONS
                 ) != PackageManager.PERMISSION_GRANTED
             ) {
-                // TODO: Consider calling
-                //    ActivityCompat#requestPermissions
-                // here to request the missing permissions, and then overriding
-                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                //                                          int[] grantResults)
-                // to handle the case where the user grants the permission. See the documentation
-                // for ActivityCompat#requestPermissions for more details.
                 return
             }
             notify(1000, notification)
         }
 
-// Notification ID cannot be 0.
         startForeground(1000, notification)
     }
 
     private fun startMonitoring() {
-        // 10분 후 기울기 체크
         handler.postDelayed({
             startCamera()
         }, monitoringTime)
@@ -246,7 +199,6 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
 
             imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
                 processImage(imageProxy)
-
             }
 
             val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
@@ -265,23 +217,18 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
 
     @OptIn(ExperimentalGetImage::class)
     private fun processImage(imageProxy: ImageProxy) {
-        // ML Kit을 사용해 얼굴 인식 및 기울기 계산
         val mediaImage = imageProxy.image
 
         if (mediaImage != null) {
             val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-            checkFaceTilt(image)
+            checkFaceTiltAndPosition(image)
         }
         imageProxy.close()
     }
 
-    private fun checkFaceTilt(image: InputImage) {
+    private fun checkFaceTiltAndPosition(image: InputImage) {
         val options = FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-
-        /*    .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
-            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
-            .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)*/
             .build()
 
         val detector = FaceDetection.getClient(options)
@@ -290,113 +237,97 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
             .addOnSuccessListener { faces ->
                 var conditionMet = false
 
-                Log.d("FaceDetection", "${phoneTilt}PostureMonitoringService: faces :$faces")
                 if (faces.isNotEmpty()) {
-                    // 얼굴이 인식된 경우
+                    //얼굴 감지 하는 루프
                     for (face in faces) {
-                        // 얼굴 기울기 및 추가 정보 처리
-                        val headTiltX = face.headEulerAngleX
-                        val headTiltZ = face.headEulerAngleZ
-                        Log.d("FaceDetection", "${phoneTilt}PostureMonitoringService: headTiltX :$headTiltX")
-                        _faceAngleX.postValue(headTiltX)
-                        _faceAngleZ.postValue(headTiltZ)
-                        // 얼굴이 일정 각도 이상 기울어진 경우 처리
-                        //headTiltX 이 -값이 될수록 얼굴이 아래로 기울인 상태
-                        //PhoneTilt값이 양수이면 화면이 위로 기울여진 상태
-                        if (phoneTilt >= 4 && headTiltX<10) {
-//                            Toast.makeText(this, "거북목 조심하세요", Toast.LENGTH_LONG).show()
-                            showWarningPopup()
-                            conditionMet = true
+                        val headTiltX = face.headEulerAngleX  //앞뒤로 얼마나 기울어져 있는지 나타내는 값,X축을 기준으로 얼굴의 기울기를 나타내며, 값이 음수일수록 얼굴이 아래쪽으로 기울어진 상태입니다.
+                        val headTiltZ = face.headEulerAngleZ //headTiltZ는 사용자의 얼굴이 좌우로 얼마나 기울어져 있는지를 나타내는 값입니다. 이 값은 Y축을 기준으로 얼굴의 좌우 기울기를 나타냅니다. 이 코드에서는 경고를 위한 조건에는 포함되지 않지만, 추가적인 목 자세 분석에 사용될 수 있습니다.
+
+                        //facePosition은 사용자의 얼굴에서 특정 지점(예: 코 끝)의 좌표입니다. 이 좌표는 얼굴의 기울기뿐만 아니라 얼굴 위치를 기반으로 추가적인 계산을 위해 사용됩니다.
+                        //FaceLandmark.NOSE_BASE는 코의 기초 부분(코 밑 부분)의 위치를 의미합니다.
+                        val facePosition = face.getLandmark(FaceLandmark.NOSE_BASE)?.position
+                        // Assume we have a fixed body position for simplicity
+                        //이 부분은 어깨의 위치를 추정하는 코드입니다.
+                        //shoulderPosition은 코 끝의 좌표에서 수직으로 아래로 150픽셀 떨어진 위치에 어깨가 있다고 가정하여 계산됩니다.
+                        //이는 실제 어깨 위치를 감지하는 것이 아니라 단순히 목의 앞으로 빠진 정도를 가늠하기 위해 대략적인 값을 사용하는 것입니다.
+                        val shoulderPosition = facePosition?.let {
+                            PointF(it.x, it.y + 150)
+                        }
+
+                        if (facePosition != null && shoulderPosition != null) {
+                            //이 부분은 얼굴의 특정 지점(코 끝)과 추정된 어깨 위치 사이의 거리를 계산합니다.
+                            //피타고라스 정리를 사용하여 두 점 사이의 거리를 계산합니다.
+                            //이 거리가 줄어들수록 사용자의 목이 더 앞으로 빠져 있다는 것을 의미합니다.
+                            val distance = sqrt(
+                                (facePosition.x - shoulderPosition.x).pow(2) +
+                                        (facePosition.y - shoulderPosition.y).pow(2)
+                            )
+
+                            //phoneTilt >= 4: 휴대폰이 4도 이상 기울어져 있을 때를 의미합니다. 이것은 사용자가 화면을 내려다보고 있을 가능성이 높다는 것을 시사합니다.
+                            //headTiltX < 10: 사용자의 얼굴이 10도 이상 앞으로 숙여졌을 때를 의미합니다. 값이 음수일수록 더 숙인 상태입니다.
+                            //distance < thresholdDistance: 얼굴과 어깨 사이의 거리가 thresholdDistance보다 작을 때, 즉, 목이 앞으로 많이 빠진 상태를 의미합니다.
+                            if (phoneTilt >= 4 && headTiltX < 10 ||
+                                distance < thresholdDistance) {
+                                showWarningPopup()
+                                conditionMet = true
+                            }
                         }
                     }
-                } else {
-                    // 얼굴이 인식되지 않은 경우
-                    Log.d("FaceDetection", " PostureMonitoringService : 얼굴이 인식되지 않았습니다.")
-                }
-                Log.d("FaceDetection", " PostureMonitoringService : $conditionMet.")
-
-                if(!conditionMet){
-                    startMonitoring()
                 }else{
+                    //얼굴 인식 실패
+                    Log.e("PostureMonitoringService", "checkFaceTiltAndPosition: '얼굴 인식이 실패 했습니다.", )
+                }
+
+                if (!conditionMet) {
+                    startMonitoring()
+                } else {
                     stopCamera()
                     stopSensorMonitoring()
                     startMonitoring()
-
                 }
-
             }
             .addOnFailureListener {
-                // 오류 처리
-              /*  e->
-                Log.e("FaceDetection", " PostureMonitoringService : $e.")*/
                 startMonitoring()
             }
     }
-    //카메라 사용 최적화
-    //얼굴을 한번이라도 인식을 성공하면 카메라 기능을 끈다.
+
     private fun stopCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
         cameraProviderFuture.addListener({
             val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
-            cameraProvider.unbindAll()  // 카메라 사용 중지
+            cameraProvider.unbindAll()
         }, ContextCompat.getMainExecutor(this))
     }
 
     private fun stopSensorMonitoring() {
-       /* lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
-        cameraExecutor.shutdown()
-        handler.removeCallbacksAndMessages(null)*/
-        // 자이로센서 해제
-        sensorManager.unregisterListener(this)// 센서 리스너 해제
+        sensorManager.unregisterListener(this)
     }
+
     private fun showWarningPopup() {
-        val currentTIme = System.currentTimeMillis()
-        Log.d("FaceDetection", " showWarningPopup : ${currentTIme - lastPopupTime >= monitoringTime}.")
+        val currentTime = System.currentTimeMillis()
 
-        if(currentTIme - lastPopupTime >= monitoringTime){
-            lastPopupTime = currentTIme //팝업이 뜬후 마지막 시간을 저장한다
+        if (currentTime - lastPopupTime >= monitoringTime) {
+            lastPopupTime = currentTime
 
-//            if(!isAppInForeground(this)){
             Intent(this, WarningActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP )
-
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }.also {
                 startActivity(it)
             }
-//            }
-
-
         }
-
-
     }
 
-
-    // 자이로센서 데이터 수신
     override fun onSensorChanged(event: SensorEvent?) {
-
         event?.let {
             val x = event.values[0]
             val y = event.values[1]
             val z = event.values[2]
             val r = sqrt(x.pow(2) + y.pow(2) + z.pow(2))
 
-            Log.d("MainActivity", "onSensorChanged: x: $x, y: $y, z: $z, R: $r")
-            val xrAngle = (90 - acos(x / r) * 180 / PI).toFloat()
-            val yrAngle = (90 - acos(y / r) * 180 / PI).toFloat()
             phoneTilt = abs(event.values[2])
-            _sensorValue.postValue(abs(y))
-            _sensorFinalValue.postValue("$xrAngle,$yrAngle")
-//            binding.textview.text = String.format(
-//                "x-rotation: %.1f\u00B0 \n y-rotation: %.1f\u00B0", xrAngle, yrAngle)
         }
-
-        /*   event?.let {
-               // X축과 Z축의 기울기를 통해 스마트폰이 얼마나 기울어졌는지 계산
-               phoneTilt = Math.abs(event.values[1]) // Y축 (Pitch)
-           }*/
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
