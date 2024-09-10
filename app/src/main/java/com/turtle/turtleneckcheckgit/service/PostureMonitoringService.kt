@@ -244,6 +244,16 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
                         val headTiltX = face.headEulerAngleX  //앞뒤로 얼마나 기울어져 있는지 나타내는 값,X축을 기준으로 얼굴의 기울기를 나타내며, 값이 음수일수록 얼굴이 아래쪽으로 기울어진 상태입니다.
                         val headTiltZ = face.headEulerAngleZ //headTiltZ는 사용자의 얼굴이 좌우로 얼마나 기울어져 있는지를 나타내는 값입니다. 이 값은 Y축을 기준으로 얼굴의 좌우 기울기를 나타냅니다. 이 코드에서는 경고를 위한 조건에는 포함되지 않지만, 추가적인 목 자세 분석에 사용될 수 있습니다.
 
+
+                       /**
+                        *  24.9.10 facePosition: facePosition은 사용자의 얼굴에서 **코 끝 (Nose Base)**의 위치를 나타냅니다.
+                        * 이 위치는 FaceLandmark.NOSE_BASE를 사용하여 얻습니다. position 속성은 X, Y 좌표로 나타나며, X는 화면 좌우(수평), Y는 화면 위아래(수직)를 나타냅니다.
+
+                        * shoulderPosition: 이 위치는 어깨의 대략적인 위치를 추정하기 위해 사용합니다.
+                        *  facePosition의 Y 좌표에서 150픽셀 정도 아래로 가정하여 어깨가 있다고 간주합니다.
+
+                        * 실제 어깨를 감지하는 것이 아니라, 단순히 목이 얼마나 앞으로 빠졌는지를 계산하기 위해 어깨 위치를 임의로 설정하는 것입니다.
+*/
                         //facePosition은 사용자의 얼굴에서 특정 지점(예: 코 끝)의 좌표입니다. 이 좌표는 얼굴의 기울기뿐만 아니라 얼굴 위치를 기반으로 추가적인 계산을 위해 사용됩니다.
                         //FaceLandmark.NOSE_BASE는 코의 기초 부분(코 밑 부분)의 위치를 의미합니다.
                         val facePosition = face.getLandmark(FaceLandmark.NOSE_BASE)?.position
@@ -265,6 +275,27 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
                             //이 부분은 얼굴의 특정 지점(코 끝)과 추정된 어깨 위치 사이의 거리를 계산합니다.
                             //피타고라스 정리를 사용하여 두 점 사이의 거리를 계산합니다.
                             //이 거리가 줄어들수록 사용자의 목이 더 앞으로 빠져 있다는 것을 의미합니다.
+
+                            /**
+                             * 두 점 사이의 거리(d)는 다음과 같은 식으로 계산됩니다:
+                             * d= 루트 (X2-X1)^2 + (Y2 - Y1)^2
+                             * X1 과 y1는 facePosition(코 끝)의 좌표이고
+                             * x2 과 y2는 shoulderPosition(어깨의 추정 위치)의 좌표입니다
+                             *
+                             * 즉, 코 끝과 어깨의 X, Y 좌표 차이를 각각 제곱한 후, 두 제곱값을 더하고 제곱근을 구하면 두 점 사이의 직선 거리를 얻게 됩니다.
+                             *
+                             *
+                             */
+                            /*
+                            * facePosition.x - shoulderPosition.x는 코 끝과 어깨의 X 좌표 차이입니다.
+                            * 이 값을 제곱(pow(2))해서 거리 계산의 한 부분으로 사용합니다.
+                            * facePosition.y - shoulderPosition.y는 코 끝과 어깨의 Y 좌표 차이입니다.
+                            * 이 값을 제곱(pow(2))해서 역시 거리 계산의 또 다른 부분으로 사용합니다.
+                            * 결과: 두 제곱값을 더한 후, 그 결과에 제곱근(sqrt())을 적용하면 두 점(코 끝과 어깨)의 직선 거리를 구할 수 있습니다.*/
+
+                            /**
+                             * 이 거리는 사용자의 목이 얼마나 앞으로 빠져 있는지를 나타냅니다. 거리가 짧을수록,
+                             * 즉 코 끝과 어깨의 수직 거리 차이가 작을수록, 사용자의 목이 앞으로 더 많이 빠진 상태임을 의미합니다.*/
                             val distance = sqrt(
                                 (facePosition.x - shoulderPosition.x).pow(2) +
                                         (facePosition.y - shoulderPosition.y).pow(2)
