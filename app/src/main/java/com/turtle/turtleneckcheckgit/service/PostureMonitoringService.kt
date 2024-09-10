@@ -65,7 +65,7 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
     private val lifecycleRegistry: LifecycleRegistry = LifecycleRegistry(this)
 
     private var phoneTilt = 0f // 스마트폰의 기울기 값을 저장
-    private var monitoringTime: Long = 10 * 60 * 1000 // 10분
+    private var monitoringTime: Long = 10 *60 * 1000 // 10분
     private val binder = LocalBinder()
     private var lastPopupTime: Long = 0
     val thresholdDistance = 150f // 목이 앞으로 빠진 정도를 수치화할 때 중요한 기준이 됩니다.
@@ -228,7 +228,8 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
 
     private fun checkFaceTiltAndPosition(image: InputImage) {
         val options = FaceDetectorOptions.Builder()
-            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)  // 더 정확한 모드
+            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)  // 모든 랜드마크를 감지
             .build()
 
         val detector = FaceDetection.getClient(options)
@@ -254,6 +255,12 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
                             PointF(it.x, it.y + 150)
                         }
 
+                        Log.e("PostureMonitoringService", "headTiltX: $headTiltX", )
+                        Log.e("PostureMonitoringService", "phoneTilt: $phoneTilt", )
+
+                        Log.e("PostureMonitoringService", "FaceDetection: $facePosition", )
+                        Log.e("PostureMonitoringService", "FaceDetection_shoulderPosition: $shoulderPosition", )
+
                         if (facePosition != null && shoulderPosition != null) {
                             //이 부분은 얼굴의 특정 지점(코 끝)과 추정된 어깨 위치 사이의 거리를 계산합니다.
                             //피타고라스 정리를 사용하여 두 점 사이의 거리를 계산합니다.
@@ -262,6 +269,8 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
                                 (facePosition.x - shoulderPosition.x).pow(2) +
                                         (facePosition.y - shoulderPosition.y).pow(2)
                             )
+                            Log.e("PostureMonitoringService", "distance: $distance", )
+                            Log.e("PostureMonitoringService", "thresholdDistance: $thresholdDistance", )
 
                             //phoneTilt >= 4: 휴대폰이 4도 이상 기울어져 있을 때를 의미합니다. 이것은 사용자가 화면을 내려다보고 있을 가능성이 높다는 것을 시사합니다.
                             //headTiltX < 10: 사용자의 얼굴이 10도 이상 앞으로 숙여졌을 때를 의미합니다. 값이 음수일수록 더 숙인 상태입니다.
