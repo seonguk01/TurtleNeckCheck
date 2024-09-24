@@ -63,9 +63,9 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
     private lateinit var accelerometer: Sensor
     private var CHANNEL_ID = "turtle_neck"
     private val lifecycleRegistry: LifecycleRegistry = LifecycleRegistry(this)
-
-    private var phoneTilt = 0f // 스마트폰의 기울기 값을 저장
-    private var monitoringTime: Long = 10 *60 * 1000 // 10분
+    private var phoneTiltXAngle = 0f // 스마트폰의 기울기 값을 저장
+    private var phoneTiltYAngle = 0f // 스마트폰의 기울기 값을 저장
+    private var monitoringTime: Long = 10  * 1000 // 10분
     private val binder = LocalBinder()
     private var lastPopupTime: Long = 0
     val thresholdDistance = 150f // 목이 앞으로 빠진 정도를 수치화할 때 중요한 기준이 됩니다.
@@ -84,10 +84,10 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
         handler = Handler(mainLooper)
 
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)!!
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY)!! //중력 가속도만 체크
 
         // 자이로 센서 등록
-        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL)
+        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_FASTEST)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -266,7 +266,6 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
                         }
 
                         Log.e("PostureMonitoringService", "headTiltX: $headTiltX", )
-                        Log.e("PostureMonitoringService", "phoneTilt: $phoneTilt", )
 
                         Log.e("PostureMonitoringService", "FaceDetection: $facePosition", )
                         Log.e("PostureMonitoringService", "FaceDetection_shoulderPosition: $shoulderPosition", )
@@ -303,10 +302,10 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
                             Log.e("PostureMonitoringService", "distance: $distance", )
                             Log.e("PostureMonitoringService", "thresholdDistance: $thresholdDistance", )
 
-                            //phoneTilt >= 4: 휴대폰이 4도 이상 기울어져 있을 때를 의미합니다. 이것은 사용자가 화면을 내려다보고 있을 가능성이 높다는 것을 시사합니다.
+                            //phoneTilt >= 80: 휴대폰각도가 80보다 작아졌을때 폰화면이 위로 향한걸로 인식한다. 이상 기울어져 있을 때를 의미합니다. 이것은 사용자가 화면을 내려다보고 있을 가능성이 높다는 것을 시사합니다.
                             //headTiltX < 10: 사용자의 얼굴이 10도 이상 앞으로 숙여졌을 때를 의미합니다. 값이 음수일수록 더 숙인 상태입니다.
                             //distance < thresholdDistance: 얼굴과 어깨 사이의 거리가 thresholdDistance보다 작을 때, 즉, 목이 앞으로 많이 빠진 상태를 의미합니다.
-                            if (phoneTilt >= 4 && headTiltX < 10 ||
+                            if (phoneTiltYAngle<70 && headTiltX < 10 ||
                                 distance < thresholdDistance) {
                                 showWarningPopup()
                                 conditionMet = true
@@ -366,7 +365,11 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
             val z = event.values[2]
             val r = sqrt(x.pow(2) + y.pow(2) + z.pow(2))
 
-            phoneTilt = abs(event.values[2])
+            phoneTiltXAngle = (90 - acos(x/r) * 180 / PI).toFloat()
+            phoneTiltYAngle = (90 - acos(y/r) * 180 /PI).toFloat()
+
+            //기기가 누워있는것은 x,y 축으로 90 도 누워 있는 경우이기 떄문에 90 에서 빼준다.
+            Log.e("TAG", "onSensorChanged: $x  , y: $y, z: $z, r : $r [xAngle : $phoneTiltXAngle, yAngle $phoneTiltYAngle]", )
         }
     }
 
