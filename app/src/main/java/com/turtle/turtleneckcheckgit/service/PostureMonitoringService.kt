@@ -47,11 +47,13 @@ import com.turtle.turtleneckcheckgit.receiver.WidgetReceiver
 import com.turtle.turtleneckcheckgit.util.Util.isAppInForeground
 import handasoft.mobile.divination.module.pref.SharedPreference
 import handasoft.mobile.divination.module.pref.SharedPreference.putSharedPreference
+import java.lang.Math.toDegrees
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.acos
+import kotlin.math.atan2
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -65,7 +67,7 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
     private val lifecycleRegistry: LifecycleRegistry = LifecycleRegistry(this)
     private var phoneTiltXAngle = 0f // 스마트폰의 기울기 값을 저장
     private var phoneTiltYAngle = 0f // 스마트폰의 기울기 값을 저장
-    private var monitoringTime: Long = 10  * 1000 // 10분
+    private var monitoringTime: Long = 10*60  * 1000 // 10분
     private val binder = LocalBinder()
     private var lastPopupTime: Long = 0
     val thresholdDistance = 150f // 목이 앞으로 빠진 정도를 수치화할 때 중요한 기준이 됩니다.
@@ -256,25 +258,51 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
 */
                         //facePosition은 사용자의 얼굴에서 특정 지점(예: 코 끝)의 좌표입니다. 이 좌표는 얼굴의 기울기뿐만 아니라 얼굴 위치를 기반으로 추가적인 계산을 위해 사용됩니다.
                         //FaceLandmark.NOSE_BASE는 코의 기초 부분(코 밑 부분)의 위치를 의미합니다.
-                        val facePosition = face.getLandmark(FaceLandmark.NOSE_BASE)?.position
-                        // Assume we have a fixed body position for simplicity
-                        //이 부분은 어깨의 위치를 추정하는 코드입니다.
-                        //shoulderPosition은 코 끝의 좌표에서 수직으로 아래로 150픽셀 떨어진 위치에 어깨가 있다고 가정하여 계산됩니다.
-                        //이는 실제 어깨 위치를 감지하는 것이 아니라 단순히 목의 앞으로 빠진 정도를 가늠하기 위해 대략적인 값을 사용하는 것입니다.
-                        val shoulderPosition = facePosition?.let {
-                            PointF(it.x, it.y + 150)
-                        }
+                       val leftEar = face.getLandmark(FaceLandmark.LEFT_EAR)
+                        val rightEar = face.getLandmark(FaceLandmark.RIGHT_EAR)
+                        val noseBase = face.getLandmark(FaceLandmark.NOSE_BASE)
+                        val leftEye = face.getLandmark(FaceLandmark.LEFT_EYE)
+                        val rightEye = face.getLandmark(FaceLandmark.RIGHT_EYE)
 
-                        Log.e("PostureMonitoringService", "headTiltX: $headTiltX", )
+                        if (leftEar != null && rightEar != null && noseBase != null && leftEye != null && rightEye != null) {
+                            // 얼굴의 넓이를 계산 (양쪽 귀 사이 거리)
+                            val faceWidth = rightEar.position.x - leftEar.position.x
 
-                        Log.e("PostureMonitoringService", "FaceDetection: $facePosition", )
-                        Log.e("PostureMonitoringService", "FaceDetection_shoulderPosition: $shoulderPosition", )
+                            // 눈 중심 계산
+                            val eyeCenterY = (leftEye.position.y + rightEye.position.y) / 2
 
-                        if (facePosition != null && shoulderPosition != null) {
+                            // deltaY를 얼굴 크기로 정규화하여 카메라 거리 영향 최소화
+                            val deltaY = (noseBase.position.y - eyeCenterY) / faceWidth
+
+                            // 목이 앞으로 쏠린 각도 계산
+                            val angle = toDegrees(atan2(deltaY.toDouble(), 1.0)) // deltaX는 1.0으로 고정하여 비율만 사용
+
+
+
+                            Log.e("PostureMonitoringService", "headTiltX: $headTiltX",)
+
+                            Log.e(
+                                "PostureMonitoringService",
+                                "FaceDetection: leftEar : $leftEar, leftEye: $leftEye,  rightEye:$rightEye",
+                            )
+                            Log.e("PostureMonitoringService", "noseBase: $noseBase",)
+                            Log.e(
+                                "PostureMonitoringService",
+                                "eyeCenterY :$eyeCenterY ",
+                            )
+                            Log.e("PostureMonitoringService", " deltaY: $deltaY",)
+                            Log.e("PostureMonitoringService", "angle: $angle",)
+                            if (phoneTiltYAngle<70 && headTiltX < 10 ||
+                                angle > 20) {
+                                showWarningPopup()
+                                conditionMet = true
+                            }
+                            /*if (facePosition != null && shoulderPosition != null) {
                             //이 부분은 얼굴의 특정 지점(코 끝)과 추정된 어깨 위치 사이의 거리를 계산합니다.
                             //피타고라스 정리를 사용하여 두 점 사이의 거리를 계산합니다.
                             //이 거리가 줄어들수록 사용자의 목이 더 앞으로 빠져 있다는 것을 의미합니다.
 
+                            */
                             /**
                              * 두 점 사이의 거리(d)는 다음과 같은 식으로 계산됩니다:
                              * d= 루트 (X2-X1)^2 + (Y2 - Y1)^2
@@ -284,23 +312,28 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
                              * 즉, 코 끝과 어깨의 X, Y 좌표 차이를 각각 제곱한 후, 두 제곱값을 더하고 제곱근을 구하면 두 점 사이의 직선 거리를 얻게 됩니다.
                              *
                              *
-                             */
-                            /*
+                             *//*
+                            *//*
                             * facePosition.x - shoulderPosition.x는 코 끝과 어깨의 X 좌표 차이입니다.
                             * 이 값을 제곱(pow(2))해서 거리 계산의 한 부분으로 사용합니다.
                             * facePosition.y - shoulderPosition.y는 코 끝과 어깨의 Y 좌표 차이입니다.
                             * 이 값을 제곱(pow(2))해서 역시 거리 계산의 또 다른 부분으로 사용합니다.
-                            * 결과: 두 제곱값을 더한 후, 그 결과에 제곱근(sqrt())을 적용하면 두 점(코 끝과 어깨)의 직선 거리를 구할 수 있습니다.*/
+                            * 결과: 두 제곱값을 더한 후, 그 결과에 제곱근(sqrt())을 적용하면 두 점(코 끝과 어깨)의 직선 거리를 구할 수 있습니다.*//*
 
+                            */
                             /**
                              * 이 거리는 사용자의 목이 얼마나 앞으로 빠져 있는지를 나타냅니다. 거리가 짧을수록,
-                             * 즉 코 끝과 어깨의 수직 거리 차이가 작을수록, 사용자의 목이 앞으로 더 많이 빠진 상태임을 의미합니다.*/
+                             * 즉 코 끝과 어깨의 수직 거리 차이가 작을수록, 사용자의 목이 앞으로 더 많이 빠진 상태임을 의미합니다.*//*
                             val distance = sqrt(
                                 (facePosition.x - shoulderPosition.x).pow(2) +
                                         (facePosition.y - shoulderPosition.y).pow(2)
                             )
                             Log.e("PostureMonitoringService", "distance: $distance", )
                             Log.e("PostureMonitoringService", "thresholdDistance: $thresholdDistance", )
+                            Log.e(
+                                "PostureMonitoringService",
+                                "thresholdDistance: ${(facePosition.y - shoulderPosition.y).pow(2)}"
+                            )
 
                             //phoneTilt >= 80: 휴대폰각도가 80보다 작아졌을때 폰화면이 위로 향한걸로 인식한다. 이상 기울어져 있을 때를 의미합니다. 이것은 사용자가 화면을 내려다보고 있을 가능성이 높다는 것을 시사합니다.
                             //headTiltX < 10: 사용자의 얼굴이 10도 이상 앞으로 숙여졌을 때를 의미합니다. 값이 음수일수록 더 숙인 상태입니다.
@@ -310,6 +343,7 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
                                 showWarningPopup()
                                 conditionMet = true
                             }
+                        }*/
                         }
                     }
                 }else{
