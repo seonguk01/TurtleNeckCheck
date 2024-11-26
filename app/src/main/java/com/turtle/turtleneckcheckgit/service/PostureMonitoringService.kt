@@ -47,6 +47,7 @@ import kotlin.math.acos
 import kotlin.math.atan2
 import kotlin.math.pow
 import kotlin.math.sqrt
+import android.content.res.Configuration
 
 class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner {
 
@@ -58,7 +59,7 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
     private val lifecycleRegistry: LifecycleRegistry = LifecycleRegistry(this)
     private var phoneTiltXAngle = 0f // 스마트폰의 기울기 값을 저장
     private var phoneTiltYAngle = 0f // 스마트폰의 기울기 값을 저장
-    private var monitoringTime: Long = 10*60  * 1000 // 10분
+    private var monitoringTime: Long = 10 * 1000 // 10분
     private val binder = LocalBinder()
     private var lastPopupTime: Long = 0
     val thresholdDistance = 150f // 목이 앞으로 빠진 정도를 수치화할 때 중요한 기준이 됩니다.
@@ -106,6 +107,10 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
         return START_REDELIVER_INTENT
     }
 
+    private fun isLandscapeMode(): Boolean {
+        val orientation = resources.configuration.orientation
+        return orientation == Configuration.ORIENTATION_LANDSCAPE
+    }
     private fun stopService() {
         try {
             stopCamera()
@@ -239,17 +244,17 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
 
 
                         /**
-                        *  24.9.10 facePosition: facePosition은 사용자의 얼굴에서 **코 끝 (Nose Base)**의 위치를 나타냅니다.
-                        * 이 위치는 FaceLandmark.NOSE_BASE를 사용하여 얻습니다. position 속성은 X, Y 좌표로 나타나며, X는 화면 좌우(수평), Y는 화면 위아래(수직)를 나타냅니다.
+                         *  24.9.10 facePosition: facePosition은 사용자의 얼굴에서 **코 끝 (Nose Base)**의 위치를 나타냅니다.
+                         * 이 위치는 FaceLandmark.NOSE_BASE를 사용하여 얻습니다. position 속성은 X, Y 좌표로 나타나며, X는 화면 좌우(수평), Y는 화면 위아래(수직)를 나타냅니다.
 
-                        * shoulderPosition: 이 위치는 어깨의 대략적인 위치를 추정하기 위해 사용합니다.
-                        *  facePosition의 Y 좌표에서 150픽셀 정도 아래로 가정하여 어깨가 있다고 간주합니다.
+                         * shoulderPosition: 이 위치는 어깨의 대략적인 위치를 추정하기 위해 사용합니다.
+                         *  facePosition의 Y 좌표에서 150픽셀 정도 아래로 가정하여 어깨가 있다고 간주합니다.
 
-                        * 실제 어깨를 감지하는 것이 아니라, 단순히 목이 얼마나 앞으로 빠졌는지를 계산하기 위해 어깨 위치를 임의로 설정하는 것입니다.
-*/
+                         * 실제 어깨를 감지하는 것이 아니라, 단순히 목이 얼마나 앞으로 빠졌는지를 계산하기 위해 어깨 위치를 임의로 설정하는 것입니다.
+                         */
                         //facePosition은 사용자의 얼굴에서 특정 지점(예: 코 끝)의 좌표입니다. 이 좌표는 얼굴의 기울기뿐만 아니라 얼굴 위치를 기반으로 추가적인 계산을 위해 사용됩니다.
                         //FaceLandmark.NOSE_BASE는 코의 기초 부분(코 밑 부분)의 위치를 의미합니다.
-                       val leftEar = face.getLandmark(FaceLandmark.LEFT_EAR)
+                        val leftEar = face.getLandmark(FaceLandmark.LEFT_EAR)
                         val rightEar = face.getLandmark(FaceLandmark.RIGHT_EAR)
                         val noseBase = face.getLandmark(FaceLandmark.NOSE_BASE)
                         val leftEye = face.getLandmark(FaceLandmark.LEFT_EYE)
@@ -272,24 +277,34 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
 
 
                             Log.e("PostureMonitoringService", "headTiltX: $headTiltX")
-
-                            Log.e(
-                                "PostureMonitoringService",
-                                "FaceDetection: leftEar : $leftEar, leftEye: $leftEye,  rightEye:$rightEye",
-                            )
-                            Log.e("PostureMonitoringService", "noseBase: $noseBase")
-                            Log.e(
-                                "PostureMonitoringService",
-                                "eyeCenterY :$eyeCenterY ",
-                            )
-                            Log.e("PostureMonitoringService", " deltaY: $deltaY")
-                            Log.e("PostureMonitoringService", "angle: $angle")
-                            if (neckTiltAngle <70 ||
-                                angle > 20) {
-                                showWarningPopup()
-                                conditionMet = true
+                            Log.e("PostureMonitoringService", "neckTiltAngle: $neckTiltAngle")
+                            Log.e("PostureMonitoringService", "phoneTiltYAngle: $phoneTiltYAngle")
+                            Log.e("PostureMonitoringService", "phoneTiltXAngle: $phoneTiltXAngle")
+                            when {
+                                phoneTiltYAngle in 70f..90f && (neckTiltAngle > 20 || angle > 20) -> {
+                                    conditionMet = true
+                                }
+                                phoneTiltYAngle in 60f..70f && (neckTiltAngle > 28 || angle > 20) -> {
+                                    conditionMet = true
+                                }
+                                phoneTiltYAngle in 45f..60f && (neckTiltAngle > 35 || angle > 20) -> {
+                                    conditionMet = true
+                                }
+                                phoneTiltYAngle in 35f..45f && (neckTiltAngle > 42 || angle > 20) -> {
+                                    conditionMet = true
+                                }
+                                phoneTiltYAngle in 30f..35f && (neckTiltAngle > 47 || angle > 20) -> {
+                                    conditionMet = true
+                                }
+                                phoneTiltYAngle <= 30f && (neckTiltAngle > 50 || angle > 20) -> {
+                                    conditionMet = true
+                                }
                             }
 
+                            if (conditionMet) {
+                                showWarningPopup()
+                                break  // Exit the loop as soon as one condition is met
+                            }
                         }
                     }
                 }else{
@@ -345,10 +360,17 @@ class PostureMonitoringService : Service(), SensorEventListener, LifecycleOwner 
             val z = event.values[2]
             val r = sqrt(x.pow(2) + y.pow(2) + z.pow(2))
 
-            phoneTiltXAngle = (90 - acos(x/r) * 180 / PI).toFloat()
-            phoneTiltYAngle = (90 - acos(y/r) * 180 /PI).toFloat()
+            // 현재 화면 방향에 따라 각도 계산 방식 조정
+            if (isLandscapeMode()) {
+                // 가로 모드일 때, X와 Y 축을 바꿔서 계산
+                phoneTiltXAngle = (90 - acos(y/r) * 180 / PI).toFloat() // 가로모드에서 Y축을 X축으로 취급
+                phoneTiltYAngle = (90 - acos(x/r) * 180 / PI).toFloat() // 가로모드에서 X축을 Y축으로 취급
+            } else {
+                // 세로 모드일 때, 기존대로 처리
+                phoneTiltXAngle = (90 - acos(x/r) * 180 / PI).toFloat()
+                phoneTiltYAngle = (90 - acos(y/r) * 180 / PI).toFloat()
+            }
 
-            //기기가 누워있는것은 x,y 축으로 90 도 누워 있는 경우이기 떄문에 90 에서 빼준다.
             Log.e(
                 "TAG",
                 "onSensorChanged: $x  , y: $y, z: $z, r : $r [xAngle : $phoneTiltXAngle, yAngle $phoneTiltYAngle]"
